@@ -36,7 +36,8 @@ ai_news:
     - "22:00"
 
   # Jinja2 template for ai_news input. Context: entries (list), total (int).
-  # Each entry has: datetime, category, title, content, url.
+  # Each entry has: datetime, category, title, content (markdownified), url, tags.
+  # Example: "{{ entries | map(attribute='title') | join('\n') }}\n{{ entries | map(attribute='content') | join('\n') }}"
   input: "{{ entries | map(attribute='content') | join('\n') }}"
 
   # When true, summary LLM call uses summary_block output as input (old behavior).
@@ -53,6 +54,7 @@ agents:
     title: '֎ AI summary:'
     # Jinja2 template for agent input. Context: all entry fields (see agents.json).
     # Note: content is pre-markdownified (HTML → markdown) before template rendering.
+    # Example: "Title: {{ title }}\nTags: {{ tags | join(', ') }}\n{{ content }}"
     input: "{{ content }}"
     prompt:
       'Summarize the content in three sentences, less than 60 characters. Do not answer the questions within the content.'
@@ -65,6 +67,7 @@ agents:
     title: "🌐AI translate: "
     # Jinja2 template for agent input. Context: all entry fields (see agents.json).
     # Note: content is pre-markdownified (HTML → markdown) before template rendering.
+    # Example: "Title: {{ title }}\nTags: {{ tags | join(', ') }}\n{{ content }}"
     input: "{{ content }}"
     prompt:
       You are a highly skilled translation engine with expertise in the news media sector.

@@ -41,7 +41,8 @@ def process_entry(miniflux_client, entry):
                     'category': entry['feed']['category']['title'],
                     'title': entry['title'],
                     'content': response_content,
-                    'url': entry['url']
+                    'url': entry['url'],
+                    'tags': entry.get('tags', [])
                 }
                 with file_lock:
                     try:

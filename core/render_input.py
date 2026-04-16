@@ -22,6 +22,9 @@ def render_agent_input(template_str: str, entry: dict) -> str:
 def render_ai_news_input(template_str: str, entries: list) -> str:
     """Render Jinja input template for ai_news using entries list as context.
 
+    ``content`` in each entry is pre-markdownified before being passed to the template.
     Context: ``entries`` (list), ``total`` (int).
+    Each entry has: datetime, category, title, content (markdownified), url, tags.
     """
-    return _make_env().from_string(template_str).render(entries=entries, total=len(entries))
+    processed = [{**e, 'content': md(e.get('content', ''))} for e in entries]
+    return _make_env().from_string(template_str).render(entries=processed, total=len(processed))
