@@ -6,6 +6,7 @@ The Flask server starts automatically when `webhook_secret` or `ai_news_schedule
 |--------|------|------|-------------|
 | `POST` | `/api/miniflux-ai` | HMAC signature | Miniflux webhook receiver |
 | `POST` | `/api/reprocess` | None | Force reprocess entries (see below) |
+| `POST` | `/api/generate-daily-news` | None | Trigger daily news generation immediately |
 | `GET`  | `/rss/ai-news` | None | AI news RSS feed |
 
 ## `POST /api/reprocess`
@@ -48,3 +49,24 @@ curl -X POST http://localhost:80/api/reprocess \
 ```
 
 Processing runs in background; response returns immediately with count of queued entries.
+
+## `POST /api/generate-daily-news`
+
+Triggers immediate daily news generation from accumulated `entries.json` content.
+
+**Auth**: None required.
+
+**Request body**: None.
+
+**Example**:
+
+```bash
+curl -X POST http://localhost:80/api/generate-daily-news
+```
+
+**Response**:
+```json
+{"status": "ok"}
+```
+
+Generation runs in background; response returns immediately. On completion, `ai_news.json` is updated and the Miniflux AI news feed is refreshed.
