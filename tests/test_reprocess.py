@@ -9,7 +9,8 @@ _client_patcher.start()
 
 from myapp import app
 import myapp.reprocess as reprocess_module
-from myapp.reprocess import _parse_duration
+import core.reprocess_utils as reprocess_utils_module
+from core.reprocess_utils import parse_duration
 
 
 def _make_entries(n=2):
@@ -18,42 +19,48 @@ def _make_entries(n=2):
 
 class TestParseDuration(unittest.TestCase):
     def test_minutes(self):
-        self.assertEqual(_parse_duration('30m'), 1800)
+        self.assertEqual(parse_duration('30m'), 1800)
 
     def test_hours(self):
-        self.assertEqual(_parse_duration('2h'), 7200)
+        self.assertEqual(parse_duration('2h'), 7200)
 
     def test_days(self):
-        self.assertEqual(_parse_duration('1d'), 86400)
+        self.assertEqual(parse_duration('1d'), 86400)
 
     def test_whitespace(self):
-        self.assertEqual(_parse_duration(' 5h '), 18000)
+        self.assertEqual(parse_duration(' 5h '), 18000)
 
     def test_invalid_unit(self):
-        self.assertIsNone(_parse_duration('10s'))
+        self.assertIsNone(parse_duration('10s'))
 
     def test_invalid_format(self):
-        self.assertIsNone(_parse_duration('abc'))
+        self.assertIsNone(parse_duration('abc'))
 
     def test_empty(self):
-        self.assertIsNone(_parse_duration(''))
+        self.assertIsNone(parse_duration(''))
 
 
 class TestReprocessEndpoint(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
         self.client = app.test_client()
-        # Fresh mock for each test
         self.mock_mc = MagicMock()
         self.mock_mc.get_entries.return_value = _make_entries(3)
         self._mc_patch = patch.object(reprocess_module, 'miniflux_client', self.mock_mc)
         self._mc_patch.start()
-        # Suppress background processing so threads don't outlive the test
-        self._run_patch = patch.object(reprocess_module, '_run_process')
+        # Also patch the miniflux_client inside reprocess_utils used by fetch_entries_by_scope
+        self._utils_mc_patch = patch.object(reprocess_utils_module, 'run_process')
+        self._utils_mc_patch.start()
+        # Patch fetch_entries_by_scope's miniflux_client reference via reprocess_module
+        self._fetch_patch = patch('core.reprocess_utils.fetch_entries_by_scope',
+                                   wraps=reprocess_utils_module.fetch_entries_by_scope)
+        # Suppress background thread
+        self._run_patch = patch('myapp.reprocess.run_process')
         self._run_patch.start()
 
     def tearDown(self):
         self._mc_patch.stop()
+        self._utils_mc_patch.stop()
         self._run_patch.stop()
 
     def _post(self, body, headers=None):
@@ -86,7 +93,7 @@ class TestReprocessEndpoint(unittest.TestCase):
         self.mock_mc.get_entries.assert_called_once_with(limit=10, order='published_at', direction='desc')
 
     def test_scope_duration(self):
-        with patch('myapp.reprocess.time') as mock_time:
+        with patch('core.reprocess_utils.time') as mock_time:
             mock_time.time.return_value = 10000
             resp = self._post({'scope': 'duration', 'duration': '1h'})
         self.assertEqual(resp.status_code, 200)
@@ -140,7 +147,6 @@ class TestReprocessEndpoint(unittest.TestCase):
     # --- auth ---
 
     def test_no_auth_required(self):
-        # endpoint accessible without any Authorization header
         resp = self._post({'scope': 'unread'})
         self.assertEqual(resp.status_code, 200)
 

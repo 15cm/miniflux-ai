@@ -18,24 +18,24 @@ def process_entry(miniflux_client, entry):
     #Todo change to queue
     llm_result = ''
 
-    for agent in config.agents.items():
+    for agent_name, agent_conf in config.agents.items():
         # filter, if AI is not generating, and in allow_list, or not in deny_list
-        if filter_entry(config, agent, entry):
+        if filter_entry(config, (agent_name, agent_conf), entry):
 
-            input_text = render_agent_input(agent[1]['input'], entry)
+            input_text = render_agent_input(agent_conf['input'], entry)
 
             try:
-                response_content = get_ai_result(agent[1]["prompt"], input_text)
+                response_content = get_ai_result(agent_conf["prompt"], input_text)
             except Exception as e:
                 logger.error(
-                    f"Error processing entry {entry['id']} with agent {agent[0]}: {e}"
+                    f"Error processing entry {entry['id']} with agent {agent_name}: {e}"
                 )
                 continue
             log_content = (response_content or "")[:20] + '...' if len(response_content or "") > 20 else response_content
-            logger.info(f"agents:{agent[0]} feed_id:{entry['id']} result:{log_content}")
+            logger.info(f"agents:{agent_name} feed_id:{entry['id']} result:{log_content}")
 
             # save for ai_summary
-            if agent[0] == 'summary':
+            if agent_name == 'summary':
                 entry_list = {
                     'datetime': entry['created_at'],
                     'category': entry['feed']['category']['title'],
@@ -54,13 +54,13 @@ def process_entry(miniflux_client, entry):
                     with open('entries.json', 'w') as file:
                         json.dump(data, file, indent=4, ensure_ascii=False)
 
-            if agent[1]['style_block']:
+            if agent_conf['style_block']:
                 llm_result = (llm_result + '<blockquote>\n  <p><strong>'
-                              + agent[1]['title'] + '</strong> '
+                              + agent_conf['title'] + '</strong> '
                               + response_content.replace('\n', '').replace('\r', '')
                               + '\n</p>\n</blockquote><br/>')
             else:
-                llm_result = llm_result + f"{agent[1]['title']}{markdown.markdown(response_content)}<hr><br />"
+                llm_result = llm_result + f"{agent_conf['title']}{markdown.markdown(response_content)}<hr><br />"
 
     if len(llm_result) > 0:
         dict_result = miniflux_client.update_entry(entry['id'], content= llm_result + entry['content'])
