@@ -48,16 +48,12 @@ class TestReprocessEndpoint(unittest.TestCase):
         self.mock_mc.get_entries.return_value = _make_entries(3)
         self._mc_patch = patch.object(reprocess_module, 'miniflux_client', self.mock_mc)
         self._mc_patch.start()
-        # No auth by default
-        self._secret_patch = patch.object(reprocess_module.config, 'miniflux_webhook_secret', None)
-        self._secret_patch.start()
         # Suppress background processing so threads don't outlive the test
         self._run_patch = patch.object(reprocess_module, '_run_process')
         self._run_patch.start()
 
     def tearDown(self):
         self._mc_patch.stop()
-        self._secret_patch.stop()
         self._run_patch.stop()
 
     def _post(self, body, headers=None):
@@ -143,29 +139,8 @@ class TestReprocessEndpoint(unittest.TestCase):
 
     # --- auth ---
 
-    def test_auth_required_valid_token(self):
-        self._secret_patch.stop()
-        self._secret_patch = patch.object(reprocess_module.config, 'miniflux_webhook_secret', 'mysecret')
-        self._secret_patch.start()
-        resp = self._post({'scope': 'unread'}, headers={'Authorization': 'Bearer mysecret'})
-        self.assertEqual(resp.status_code, 200)
-
-    def test_auth_required_wrong_token(self):
-        self._secret_patch.stop()
-        self._secret_patch = patch.object(reprocess_module.config, 'miniflux_webhook_secret', 'mysecret')
-        self._secret_patch.start()
-        resp = self._post({'scope': 'unread'}, headers={'Authorization': 'Bearer wrongtoken'})
-        self.assertEqual(resp.status_code, 403)
-
-    def test_auth_required_missing_header(self):
-        self._secret_patch.stop()
-        self._secret_patch = patch.object(reprocess_module.config, 'miniflux_webhook_secret', 'mysecret')
-        self._secret_patch.start()
-        resp = self._post({'scope': 'unread'})
-        self.assertEqual(resp.status_code, 403)
-
-    def test_no_auth_when_secret_not_set(self):
-        # secret is None (default setUp), no header needed
+    def test_no_auth_required(self):
+        # endpoint accessible without any Authorization header
         resp = self._post({'scope': 'unread'})
         self.assertEqual(resp.status_code, 200)
 

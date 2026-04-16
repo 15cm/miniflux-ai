@@ -5,14 +5,14 @@ The Flask server starts automatically when `webhook_secret` or `ai_news_schedule
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/miniflux-ai` | HMAC signature | Miniflux webhook receiver |
-| `POST` | `/api/reprocess` | Bearer token | Force reprocess entries (see below) |
+| `POST` | `/api/reprocess` | None | Force reprocess entries (see below) |
 | `GET`  | `/rss/ai-news` | None | AI news RSS feed |
 
 ## `POST /api/reprocess`
 
 Triggers immediate reprocessing of entries through all configured agents.
 
-**Auth**: If `webhook_secret` is set in config, include header `Authorization: Bearer <webhook_secret>`.
+**Auth**: None required.
 
 **Request body** (JSON):
 
@@ -27,18 +27,17 @@ Triggers immediate reprocessing of entries through all configured agents.
 
 ```bash
 # Reprocess all unread entries
-curl -X POST http://localhost/api/reprocess \
+curl -X POST http://localhost:80/api/reprocess \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer your_secret' \
   -d '{"scope": "unread"}'
 
 # Reprocess last 50 entries
-curl -X POST http://localhost/api/reprocess \
+curl -X POST http://localhost:80/api/reprocess \
   -H 'Content-Type: application/json' \
   -d '{"scope": "last_n", "n": 50}'
 
 # Reprocess entries from the last 6 hours
-curl -X POST http://localhost/api/reprocess \
+curl -X POST http://localhost:80/api/reprocess \
   -H 'Content-Type: application/json' \
   -d '{"scope": "duration", "duration": "6h"}'
 ```

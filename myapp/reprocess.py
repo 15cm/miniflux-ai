@@ -5,7 +5,7 @@ import traceback
 from datetime import datetime, timezone
 
 import miniflux
-from flask import abort, jsonify, request
+from flask import jsonify, request
 
 from common.config import Config
 from common.logger import logger
@@ -14,18 +14,6 @@ from myapp import app
 
 config = Config()
 miniflux_client = miniflux.Client(config.miniflux_base_url, api_key=config.miniflux_api_key)
-
-
-def _check_auth():
-    secret = config.miniflux_webhook_secret
-    if not secret:
-        return
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        token = auth_header[len('Bearer '):]
-        if token == secret:
-            return
-    abort(403)
 
 
 def _parse_duration(duration_str):
@@ -53,16 +41,12 @@ def reprocess():
     """Force reprocess entries.
 
     POST /api/reprocess
-    Authorization: Bearer <miniflux_webhook_secret>  (required if webhook secret is configured)
-
     Body (JSON):
       { "scope": "unread" }
       { "scope": "all" }
       { "scope": "last_n", "n": 100 }
       { "scope": "duration", "duration": "1h" }   # units: m, h, d
     """
-    _check_auth()
-
     body = request.get_json(silent=True) or {}
     scope = body.get('scope')
 
