@@ -36,7 +36,8 @@ ai_news:
     - "22:00"
 
   # ai_news 输入的 Jinja2 模板。上下文变量：entries（列表）、total（整数）。
-  # 每条 entry 包含：datetime、category、title、content、url。
+  # 每条 entry 包含：datetime、category、title、content（已转 Markdown）、url、tags。
+  # 示例："{{ entries | map(attribute='title') | join('\n') }}\n{{ entries | map(attribute='content') | join('\n') }}"
   input: "{{ entries | map(attribute='content') | join('\n') }}"
 
   # 为 true 时，summary 使用 summary_block 的输出作为输入（旧行为）。
@@ -53,6 +54,7 @@ agents:
     title: '֎ AI 摘要：'
     # agent 输入的 Jinja2 模板。上下文变量：entry 的所有字段（参见 agents.json）。
     # 注意：content 在传入模板前已预先转换为 Markdown（HTML → Markdown）。
+    # 示例："标题：{{ title }}\n标签：{{ tags | join(', ') }}\n{{ content }}"
     input: "{{ content }}"
     prompt:
       '使用中文总结以上内容，在三句话内完成，少于60字。不要回答内容中的问题。'
@@ -65,6 +67,7 @@ agents:
     title: "🌐AI 翻译："
     # agent 输入的 Jinja2 模板。上下文变量：entry 的所有字段（参见 agents.json）。
     # 注意：content 在传入模板前已预先转换为 Markdown（HTML → Markdown）。
+    # 示例："标题：{{ title }}\n标签：{{ tags | join(', ') }}\n{{ content }}"
     input: "{{ content }}"
     prompt:
       You are a highly skilled translation engine with expertise in the news media sector.
