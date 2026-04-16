@@ -61,6 +61,10 @@ The repository includes a template configuration file: `config.sample.yml`. Modi
 - **Agents**: Define each agent's prompt, allow_list/deny_list filters, and output style（`style_block` parameter controls whether the output is formatted as a code block in Markdown）.
 
 
+## REST API
+
+See [docs/rest-api.md](docs/rest-api.md) for full API reference.
+
 ## Docker Setup
 
 The project includes a `docker-compose.yml` file for easy deployment:
