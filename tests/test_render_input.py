@@ -46,25 +46,20 @@ SAMPLE_ENTRIES = [
 
 class TestRenderAgentInput(unittest.TestCase):
 
-    def test_default_template_markdownifies_content(self):
-        """Default template renders markdownified content."""
+    def test_default_template_renders_content(self):
+        """Default template renders raw content."""
         result = render_agent_input(DEFAULT_AGENT_INPUT, SAMPLE_ENTRY)
-        self.assertIn("Hello", result)
-        self.assertIn("world", result)
-        self.assertNotIn("<p>", result)
-        self.assertNotIn("<strong>", result)
+        self.assertIn("<p>Hello <strong>world</strong></p>", result)
 
     def test_custom_template_renders_fields(self):
         """Custom template can access entry fields."""
         result = render_agent_input("Title: {{ title }}\nURL: {{ url }}", SAMPLE_ENTRY)
         self.assertEqual(result, "Title: Entry Title\nURL: http://example.org/article.html")
 
-    def test_content_pre_markdownified_in_template(self):
-        """content is already markdownified when accessed in template."""
+    def test_content_raw_in_template(self):
+        """content is passed raw (not markdownified) to template."""
         result = render_agent_input("{{ content }}", SAMPLE_ENTRY)
-        self.assertIn("Hello", result)
-        self.assertNotIn("<p>", result)
-        self.assertNotIn("<strong>", result)
+        self.assertIn("<p>Hello <strong>world</strong></p>", result)
 
     def test_template_with_all_fields(self):
         """Template can access author, tags, etc."""
@@ -110,10 +105,9 @@ class TestRenderAiNewsInput(unittest.TestCase):
 class TestDefaultConstants(unittest.TestCase):
 
     def test_default_agent_input_renders_content(self):
-        """DEFAULT_AGENT_INPUT renders markdownified content."""
+        """DEFAULT_AGENT_INPUT renders raw content."""
         result = render_agent_input(DEFAULT_AGENT_INPUT, SAMPLE_ENTRY)
-        self.assertIn("Hello", result)
-        self.assertNotIn("<p>", result)
+        self.assertIn("<p>Hello <strong>world</strong></p>", result)
 
     def test_default_ai_news_input_joins_content(self):
         """DEFAULT_AI_NEWS_INPUT joins entry content with newlines."""
