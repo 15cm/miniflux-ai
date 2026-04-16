@@ -7,6 +7,7 @@ from common.config import Config
 from common.logger import logger
 from core.entry_filter import filter_entry
 from core.get_ai_result import get_ai_result
+from core.render_input import render_agent_input
 
 config = Config()
 file_lock = threading.Lock()
@@ -21,8 +22,10 @@ def process_entry(miniflux_client, entry):
         # filter, if AI is not generating, and in allow_list, or not in deny_list
         if filter_entry(config, agent, entry):
 
+            input_text = render_agent_input(agent[1]['input'], entry)
+
             try:
-                response_content = get_ai_result(agent[1]["prompt"], entry["content"])
+                response_content = get_ai_result(agent[1]["prompt"], input_text)
             except Exception as e:
                 logger.error(
                     f"Error processing entry {entry['id']} with agent {agent[0]}: {e}"

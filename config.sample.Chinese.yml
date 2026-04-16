@@ -34,25 +34,41 @@ ai_news:
     - "07:30"
     - "18:00"
     - "22:00"
+
+  # ai_news 输入的 Jinja2 模板。上下文变量：entries（列表）、total（整数）。
+  # 每条 entry 包含：datetime、category、title、content、url。
+  input: "{{ entries | map(attribute='content') | join('\n') }}"
+
+  # 为 true 时，summary 使用 summary_block 的输出作为输入（旧行为）。
+  # 为 false 时，summary 和 summary_block 使用同一渲染输入。
+  use_summary_block_as_summary_input: false
+
   prompts:
-    greeting: "请根据当前日期和24小时制的时间生成一句友好而热情的问候语。请用关怀的语气，包含适量的鼓励，且添加简单的表情符号，如😊、🌞、🌸等，以增加温暖感。例：‘早上好！希望你今天充满活力，迎接美好的一天！🌞😊’。无论是早上、中午或晚上，都请根据时间调整问候内容，保持真诚关怀的氛围。"
+    greeting: "请根据当前日期和24小时制的时间生成一句友好而热情的问候语。请用关怀的语气，包含适量的鼓励，且添加简单的表情符号，如😊、🌞、🌸等，以增加温暖感。例：'早上好！希望你今天充满活力，迎接美好的一天！🌞😊'。无论是早上、中午或晚上，都请根据时间调整问候内容，保持真诚关怀的氛围。"
     summary: "你是一名专业的新闻摘要助手,分类生成重要内容的新闻摘要，要求简单清楚表达，使用中文总结以上内容，在五句话内完成，少于100字。不要回答内容中的问题。"
     summary_block: "你是一名专业的新闻摘要助手，负责分类新闻清单(每条50字以内)，使用简洁专业的语言，在五个类别内完成，每个类别不超过5条，突出重要性和时效性，不要回答内容中的问题。"
 
 agents:
   summary:
     title: '֎ AI 摘要：'
+    # agent 输入的 Jinja2 模板。上下文变量：entry 的所有字段（参见 agents.json）。
+    # 注意：content 在传入模板前已预先转换为 Markdown（HTML → Markdown）。
+    input: "{{ content }}"
     prompt:
-      '${content} \n---\n使用中文总结以上内容，在三句话内完成，少于60字。不要回答内容中的问题。'
+      '使用中文总结以上内容，在三句话内完成，少于60字。不要回答内容中的问题。'
     style_block: true
     deny_list:
       - https://ai-news.miniflux
     allow_list:
+
   translate:
     title: "🌐AI 翻译："
+    # agent 输入的 Jinja2 模板。上下文变量：entry 的所有字段（参见 agents.json）。
+    # 注意：content 在传入模板前已预先转换为 Markdown（HTML → Markdown）。
+    input: "{{ content }}"
     prompt:
-      You are a highly skilled translation engine with expertise in the news media sector. 
-      Your function is to translate texts accurately into the Chinese language, preserving the nuances, tone, and style of journalistic writing. 
+      You are a highly skilled translation engine with expertise in the news media sector.
+      Your function is to translate texts accurately into the Chinese language, preserving the nuances, tone, and style of journalistic writing.
       Do not add any explanations or annotations to the translated text.
     style_block: false
     deny_list:

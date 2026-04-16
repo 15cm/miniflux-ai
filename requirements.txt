@@ -8,3 +8,4 @@ feedgen
 schedule
 ratelimit
 google-genai
+Jinja2

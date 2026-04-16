@@ -1,5 +1,3 @@
-from markdownify import markdownify as md
-
 from openai import OpenAI
 from google import genai
 from google.genai import types
@@ -17,24 +15,25 @@ elif config.llm_provider == "gemini":
     )
 
 
-def get_ai_result(prompt: str, request: str):
-    if config.llm_max_length and len(request) > config.llm_max_length:
-        request = request[: config.llm_max_length]
+def get_ai_result(prompt: str, input_text: str):
+    """Call LLM with prompt as system instruction and input_text as user content.
+
+    Args:
+        prompt: System instruction / role description.
+        input_text: Already-rendered user input (Jinja-rendered, markdownified if needed).
+    """
+    if config.llm_max_length and len(input_text) > config.llm_max_length:
+        input_text = input_text[: config.llm_max_length]
+
+    user_content = "The following is the input content:\n---\n" + input_text
 
     if config.llm_provider == "gemini":
         try:
-            if "${content}" in prompt:
-                instruction = ["You are a helpful assistant."]
-                contents = prompt.replace("${content}", md(request))
-            else:
-                instruction = [prompt]
-                contents = "The following is the input content:\n---\n " + md(request)
-
             response = llm_client.models.generate_content(
                 model=config.llm_model,
-                contents=contents,
+                contents=user_content,
                 config=types.GenerateContentConfig(
-                    system_instruction=instruction,
+                    system_instruction=[prompt],
                 ),
             )
             return response.text
@@ -42,31 +41,15 @@ def get_ai_result(prompt: str, request: str):
             logger.error(f"Error in get_ai_result (Gemini): {e}")
             raise
     else:
-        if "${content}" in prompt:
-            messages = [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {
-                    "role": "user",
-                    "content": prompt.replace("${content}", md(request)),
-                },
-            ]
-        else:
-            messages = [
-                {"role": "system", "content": prompt},
-                {
-                    "role": "user",
-                    "content": "The following is the input content:\n---\n "
-                    + md(request),
-                },
-            ]
-
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": user_content},
+        ]
         try:
             completion = llm_client.chat.completions.create(
                 model=config.llm_model, messages=messages, timeout=config.llm_timeout
             )
-
-            response_content = completion.choices[0].message.content
-            return response_content
+            return completion.choices[0].message.content
         except Exception as e:
             logger.error(f"Error in get_ai_result (OpenAI): {e}")
             raise

@@ -4,6 +4,7 @@ import time
 from common import logger
 from common.config import Config
 from core.get_ai_result import get_ai_result
+from core.render_input import render_ai_news_input
 
 config = Config()
 
@@ -22,13 +23,17 @@ def generate_daily_news(miniflux_client):
         return []
 
     try:
-        contents = '\n'.join([i['content'] for i in entries])
+        rendered_input = render_ai_news_input(config.ai_news_input, entries)
+
         # greeting
         greeting = get_ai_result(config.ai_news_prompts['greeting'], time.strftime('%B %d, %Y at %I:%M %p'))
         # summary_block
-        summary_block = get_ai_result(config.ai_news_prompts['summary_block'], contents)
-        # summary
-        summary = get_ai_result(config.ai_news_prompts['summary'], summary_block)
+        summary_block = get_ai_result(config.ai_news_prompts['summary_block'], rendered_input)
+        # summary: use summary_block as input (old behavior) or rendered_input (new default)
+        if config.ai_news_use_summary_block_as_summary_input:
+            summary = get_ai_result(config.ai_news_prompts['summary'], summary_block)
+        else:
+            summary = get_ai_result(config.ai_news_prompts['summary'], rendered_input)
 
         response_content = greeting + '\n\n### 🌐Summary\n' + summary + '\n\n### 📝News\n' + summary_block
 
@@ -44,10 +49,10 @@ def generate_daily_news(miniflux_client):
         if ai_news_feed_id:
             miniflux_client.refresh_feed(ai_news_feed_id)
             logger.debug('Successfully refreshed the ai_news feed in Miniflux!')
-    
+
     except Exception as e:
         logger.error(f'Error generating daily news: {e}')
-    
+
     finally:
         try:
             with open('entries.json', 'w') as f:
