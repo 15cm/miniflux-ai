@@ -25,8 +25,9 @@ def generate_daily_news(miniflux_client):
     try:
         rendered_input = render_ai_news_input(config.ai_news_input, entries)
 
-        # greeting
-        greeting = get_ai_result(config.ai_news_prompts['greeting'], time.strftime('%B %d, %Y at %I:%M %p'))
+        # greeting (optional)
+        greeting_prompt = config.ai_news_prompts.get('greeting')
+        greeting = get_ai_result(greeting_prompt, time.strftime('%B %d, %Y at %I:%M %p')) if greeting_prompt else None
         # summary_block
         summary_block = get_ai_result(config.ai_news_prompts['summary_block'], rendered_input)
         # summary: use summary_block as input (old behavior) or rendered_input (new default)
@@ -35,7 +36,12 @@ def generate_daily_news(miniflux_client):
         else:
             summary = get_ai_result(config.ai_news_prompts['summary'], rendered_input)
 
-        response_content = greeting + '\n\n### 🌐Summary\n' + summary + '\n\n### 📝News\n' + summary_block
+        parts = []
+        if greeting:
+            parts.append(greeting)
+        parts.append('### 🌐Summary\n' + summary)
+        parts.append('### 📝News\n' + summary_block)
+        response_content = '\n\n'.join(parts)
 
         logger.info('Generated daily news successfully')
 
