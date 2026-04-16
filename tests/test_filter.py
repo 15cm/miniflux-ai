@@ -1,6 +1,12 @@
 import unittest
+from types import SimpleNamespace
 from yaml import safe_load
 from core.entry_filter import filter_entry
+
+
+def _as_config(d):
+    """Wrap a raw config dict so .agents works like a real Config object."""
+    return SimpleNamespace(agents=d['agents'])
 
 test_config = '''
 {
@@ -59,7 +65,7 @@ test_entries = '''
     {
         "entry":
           {
-            "content": '<pre',
+            "content": '<blockquote>',
             "feed":
               {
                 "site_url": "https://weibo.com/1906286443/OAih1wghK",
@@ -112,13 +118,13 @@ entries = safe_load(test_entries)
 
 class MyTestCase(unittest.TestCase):
     def test_entry_filter(self):
-        i = 0
-
-        for agent in configs.items():
-            entry = entries[list(configs.keys())[i]]
-            result = filter_entry(configs['test_style_block'], agent, entry['entry'])
-            self.assertEqual(result, entry['result'])
-            i += 1
+        for key, cfg in configs.items():
+            with self.subTest(scenario=key):
+                config_obj = _as_config(cfg)
+                agent = ('test', cfg['agents']['test'])
+                entry = entries[key]
+                result = filter_entry(config_obj, agent, entry['entry'])
+                self.assertEqual(result, entry['result'])
 
 
 if __name__ == '__main__':
