@@ -37,8 +37,13 @@ ai_news:
 
   # Jinja2 template for ai_news input. Context: entries (list), total (int).
   # Each entry has: datetime, category, title, content (markdownified), url, tags.
-  # Default groups entries by category as JSON. Example override (flat content):
-  # input: "{{ entries | map(attribute='content') | join('\n') }}"
+  # Default output (grouped by category):
+  # {
+  #   "category_1": [entry{}, entry{}, ...],
+  #   "category_2": [entry{}, entry{}, ...],
+  #   ...
+  # }
+  # Example override (flat content): input: "{{ entries | map(attribute='content') | join('\n') }}"
   input: |
     {
     {%- for category, group in entries | groupby('category') %}
