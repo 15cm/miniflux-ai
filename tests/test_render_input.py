@@ -109,6 +109,33 @@ class TestRenderAiNewsInput(unittest.TestCase):
         result = render_ai_news_input("{{ entries[0].category }}", SAMPLE_ENTRIES)
         self.assertEqual(result, "Tech")
 
+    def test_config_template_groups_by_category_as_json_object(self):
+        """Config template produces proper JSON object with categories as keys."""
+        config_template = """
+{
+{%- for category, group in entries | groupby('category') %}
+  "{{ category }}": {{ group | list | tojson }}{% if not loop.last %},{% endif %}
+{%- endfor %}
+}
+"""
+        result = render_ai_news_input(config_template, SAMPLE_ENTRIES)
+        data = json.loads(result)
+
+        # Should be dict with category keys, not list of tuples
+        self.assertIsInstance(data, dict)
+        self.assertIn("Tech", data)
+        self.assertIn("Science", data)
+
+        # Each category should contain array of entries with all fields
+        self.assertEqual(len(data["Tech"]), 1)
+        self.assertEqual(data["Tech"][0]["title"], "Article One")
+        self.assertEqual(data["Tech"][0]["category"], "Tech")
+        self.assertEqual(data["Tech"][0]["datetime"], "2024-01-01T00:00:00")
+
+        self.assertEqual(len(data["Science"]), 1)
+        self.assertEqual(data["Science"][0]["title"], "Article Two")
+        self.assertEqual(data["Science"][0]["tags"], ["science"])
+
 
 class TestDefaultConstants(unittest.TestCase):
 
