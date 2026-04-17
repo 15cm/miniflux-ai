@@ -58,7 +58,8 @@ ai_news:
 agents:
   summary:
     title: '֎ AI summary:'
-    # Jinja2 template for agent input. Context: all entry fields (see agents.json).
+    # Jinja2 template for agent input. Context: applied per-entry from ai_news grouped input.
+    # Entry structure: {datetime: str, category: str, title: str, content: str, url: str, tags: list}
     # Note: content is pre-markdownified (HTML → markdown) before template rendering.
     # Example: "Title: {{ title }}\nTags: {{ tags | join(', ') }}\n{{ content }}"
     input: "{{ content }}"
@@ -71,7 +72,8 @@ agents:
 
   translate:
     title: "🌐AI translate: "
-    # Jinja2 template for agent input. Context: all entry fields (see agents.json).
+    # Jinja2 template for agent input. Context: applied per-entry from ai_news grouped input.
+    # Entry structure: {datetime: str, category: str, title: str, content: str, url: str, tags: list}
     # Note: content is pre-markdownified (HTML → markdown) before template rendering.
     # Example: "Title: {{ title }}\nTags: {{ tags | join(', ') }}\n{{ content }}"
     input: "{{ content }}"

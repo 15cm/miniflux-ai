@@ -58,7 +58,8 @@ ai_news:
 agents:
   summary:
     title: '֎ AI 摘要：'
-    # agent 输入的 Jinja2 模板。上下文变量：entry 的所有字段（参见 agents.json）。
+    # agent 输入的 Jinja2 模板。上下文应用于 ai_news 分组输入中的每个 entry。
+    # Entry 结构: {datetime: str, category: str, title: str, content: str, url: str, tags: list}
     # 注意：content 在传入模板前已预先转换为 Markdown（HTML → Markdown）。
     # 示例："标题：{{ title }}\n标签：{{ tags | join(', ') }}\n{{ content }}"
     input: "{{ content }}"
@@ -71,7 +72,8 @@ agents:
 
   translate:
     title: "🌐AI 翻译："
-    # agent 输入的 Jinja2 模板。上下文变量：entry 的所有字段（参见 agents.json）。
+    # agent 输入的 Jinja2 模板。上下文应用于 ai_news 分组输入中的每个 entry。
+    # Entry 结构: {datetime: str, category: str, title: str, content: str, url: str, tags: list}
     # 注意：content 在传入模板前已预先转换为 Markdown（HTML → Markdown）。
     # 示例："标题：{{ title }}\n标签：{{ tags | join(', ') }}\n{{ content }}"
     input: "{{ content }}"
