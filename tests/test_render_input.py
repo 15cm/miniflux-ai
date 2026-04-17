@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import unittest
 import os
 
@@ -33,6 +34,7 @@ SAMPLE_ENTRIES = [
         "title": "Article One",
         "content": "Summary of article one.",
         "url": "https://example.org/1",
+        "tags": [],
     },
     {
         "datetime": "2024-01-01T01:00:00",
@@ -40,6 +42,7 @@ SAMPLE_ENTRIES = [
         "title": "Article Two",
         "content": "Summary of article two.",
         "url": "https://example.org/2",
+        "tags": ["science"],
     },
 ]
 
@@ -74,10 +77,15 @@ class TestRenderAgentInput(unittest.TestCase):
 
 class TestRenderAiNewsInput(unittest.TestCase):
 
-    def test_default_joins_content_with_newlines(self):
-        """Default template produces newline-joined content of all entries."""
+    def test_default_groups_entries_by_category(self):
+        """Default template produces entries grouped by category as JSON."""
         result = render_ai_news_input(DEFAULT_AI_NEWS_INPUT, SAMPLE_ENTRIES)
-        self.assertEqual(result, "Summary of article one.\nSummary of article two.")
+        data = json.loads(result)
+        self.assertIn("Tech", data)
+        self.assertIn("Science", data)
+        self.assertEqual(len(data["Tech"]), 1)
+        self.assertEqual(data["Tech"][0]["title"], "Article One")
+        self.assertEqual(data["Science"][0]["title"], "Article Two")
 
     def test_custom_template_iterates_entries(self):
         """Custom template can loop over entries."""
@@ -92,9 +100,9 @@ class TestRenderAiNewsInput(unittest.TestCase):
         self.assertEqual(result, "Total: 2")
 
     def test_empty_entries_list(self):
-        """Default template with empty entries → empty string."""
+        """Default template with empty entries → empty JSON object."""
         result = render_ai_news_input(DEFAULT_AI_NEWS_INPUT, [])
-        self.assertEqual(result, "")
+        self.assertEqual(json.loads(result), {})
 
     def test_template_access_entry_fields(self):
         """Template can access category, url, etc."""
@@ -109,10 +117,12 @@ class TestDefaultConstants(unittest.TestCase):
         result = render_agent_input(DEFAULT_AGENT_INPUT, SAMPLE_ENTRY)
         self.assertIn("<p>Hello <strong>world</strong></p>", result)
 
-    def test_default_ai_news_input_joins_content(self):
-        """DEFAULT_AI_NEWS_INPUT joins entry content with newlines."""
+    def test_default_ai_news_input_groups_by_category(self):
+        """DEFAULT_AI_NEWS_INPUT groups entries by category as JSON."""
         result = render_ai_news_input(DEFAULT_AI_NEWS_INPUT, SAMPLE_ENTRIES)
-        self.assertEqual(result, "Summary of article one.\nSummary of article two.")
+        data = json.loads(result)
+        self.assertIn("Tech", data)
+        self.assertIn("Science", data)
 
 
 if __name__ == '__main__':

@@ -37,8 +37,14 @@ ai_news:
 
   # Jinja2 template for ai_news input. Context: entries (list), total (int).
   # Each entry has: datetime, category, title, content (markdownified), url, tags.
-  # Example: "{{ entries | map(attribute='title') | join('\n') }}\n{{ entries | map(attribute='content') | join('\n') }}"
-  input: "{{ entries | map(attribute='content') | join('\n') }}"
+  # Default groups entries by category as JSON. Example override (flat content):
+  # input: "{{ entries | map(attribute='content') | join('\n') }}"
+  input: |
+    {
+    {%- for category, group in entries | groupby('category') %}
+      "{{ category }}": {{ group | list | tojson }}{% if not loop.last %},{% endif %}
+    {%- endfor %}
+    }
 
   # When true, summary LLM call uses summary_block output as input (old behavior).
   # When false, both summary and summary_block receive the same rendered input.

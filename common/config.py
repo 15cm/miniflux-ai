@@ -23,7 +23,13 @@ class Config:
         self.ai_news_url = self.get_config_value('ai_news', 'url', None)
         self.ai_news_schedule = self.get_config_value('ai_news', 'schedule', None)
         self.ai_news_prompts = self.get_config_value('ai_news', 'prompts', None)
-        self.ai_news_input = self.get_config_value('ai_news', 'input', None) or "{{ entries | map(attribute='content') | join('\n') }}"
+        self.ai_news_input = self.get_config_value('ai_news', 'input', None) or (
+            '{\n'
+            '{%- for category, group in entries | groupby("category") %}\n'
+            '  "{{ category }}": {{ group | list | tojson }}{% if not loop.last %},{% endif %}\n'
+            '{%- endfor %}\n'
+            '}'
+        )
         self.ai_news_use_summary_block_as_summary_input = self.get_config_value('ai_news', 'use_summary_block_as_summary_input', False)
 
         self.agents = self.c.get('agents', {})
