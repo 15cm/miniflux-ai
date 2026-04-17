@@ -37,8 +37,14 @@ ai_news:
 
   # ai_news 输入的 Jinja2 模板。上下文变量：entries（列表）、total（整数）。
   # 每条 entry 包含：datetime、category、title、content（已转 Markdown）、url、tags。
-  # 示例："{{ entries | map(attribute='title') | join('\n') }}\n{{ entries | map(attribute='content') | join('\n') }}"
-  input: "{{ entries | map(attribute='content') | join('\n') }}"
+  # 默认按 category 分组输出 JSON。覆盖示例（纯内容拼接）：
+  # input: "{{ entries | map(attribute='content') | join('\n') }}"
+  input: |
+    {
+    {%- for category, group in entries | groupby('category') %}
+      "{{ category }}": {{ group | list | tojson }}{% if not loop.last %},{% endif %}
+    {%- endfor %}
+    }
 
   # 为 true 时，summary 使用 summary_block 的输出作为输入（旧行为）。
   # 为 false 时，summary 和 summary_block 使用同一渲染输入。

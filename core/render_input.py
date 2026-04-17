@@ -1,7 +1,13 @@
 from jinja2 import Environment, BaseLoader
 
 DEFAULT_AGENT_INPUT = "{{ content }}"
-DEFAULT_AI_NEWS_INPUT = "{{ entries | map(attribute='content') | join('\n') }}"
+DEFAULT_AI_NEWS_INPUT = (
+    '{\n'
+    '{%- for category, group in entries | groupby("category") %}\n'
+    '  "{{ category }}": {{ group | list | tojson }}{% if not loop.last %},{% endif %}\n'
+    '{%- endfor %}\n'
+    '}'
+)
 
 
 def _make_env():
