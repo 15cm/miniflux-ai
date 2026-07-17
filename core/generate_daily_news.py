@@ -200,8 +200,12 @@ def _reduce(stories):
 
 def _batched(miniflux_client, *, entry_ids=None, job_id=None):
     store = SummaryStore(config.storage.path)
+    if job_id:
+        store.update_job(job_id, status="running")
     sources = _load_sources(entry_ids)
     if not sources:
+        if job_id:
+            store.update_job(job_id, status="completed")
         return None
     selected = (
         deduplicate_entries(sources, config.ai_news_batching.similarity_threshold)
