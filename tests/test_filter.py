@@ -6,9 +6,10 @@ from core.entry_filter import filter_entry
 
 def _as_config(d):
     """Wrap a raw config dict so .agents works like a real Config object."""
-    return SimpleNamespace(agents=d['agents'])
+    return SimpleNamespace(agents=d["agents"])
 
-test_config = '''
+
+test_config = """
 {
   "test_style_block": {
     "agents": {
@@ -57,9 +58,9 @@ test_config = '''
     }
   }
 }
-'''
+"""
 
-test_entries = '''
+test_entries = """
 {
   "test_style_block":
     {
@@ -111,21 +112,22 @@ test_entries = '''
     },
 }
 
-'''
+"""
 
 configs = safe_load(test_config)
 entries = safe_load(test_entries)
+
 
 class MyTestCase(unittest.TestCase):
     def test_entry_filter(self):
         for key, cfg in configs.items():
             with self.subTest(scenario=key):
                 config_obj = _as_config(cfg)
-                agent = ('test', cfg['agents']['test'])
+                agent = ("test", cfg["agents"]["test"])
                 entry = entries[key]
-                result = filter_entry(config_obj, agent, entry['entry'])
-                self.assertEqual(result, entry['result'])
+                result = filter_entry(config_obj, agent, entry["entry"])
+                self.assertEqual(result, entry["result"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

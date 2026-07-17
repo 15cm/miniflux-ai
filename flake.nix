@@ -21,6 +21,7 @@
           schedule
           feedgen
           requests
+          tiktoken
           # Dev deps
           pytest
           pytest-cov

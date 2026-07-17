@@ -2,11 +2,11 @@ from jinja2 import Environment, BaseLoader
 
 DEFAULT_AGENT_INPUT = "{{ content }}"
 DEFAULT_AI_NEWS_INPUT = (
-    '{\n'
+    "{\n"
     '{%- for category, group in entries | groupby("category") %}\n'
     '  "{{ category }}": {{ group | list | tojson }}{% if not loop.last %},{% endif %}\n'
-    '{%- endfor %}\n'
-    '}'
+    "{%- endfor %}\n"
+    "}"
 )
 
 
@@ -28,4 +28,8 @@ def render_ai_news_input(template_str: str, entries: list) -> str:
     Context: ``entries`` (list), ``total`` (int).
     Each entry has: datetime, category, title, content, url, tags.
     """
-    return _make_env().from_string(template_str).render(entries=entries, total=len(entries))
+    return (
+        _make_env()
+        .from_string(template_str)
+        .render(entries=entries, total=len(entries))
+    )

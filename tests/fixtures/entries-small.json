@@ -1,0 +1,12 @@
+[
+  {"id": 1, "title": "English technology report", "content": "Short English article.", "url": "https://example.test/1", "tags": [], "feed": {"site_url": "https://example.test", "category": {"title": "Technology"}}, "created_at": "2026-07-17T01:00:00Z"},
+  {"id": 2, "title": "中文市场报告", "content": "这是一篇中文文章。", "url": "https://example.test/2", "tags": ["市场"], "feed": {"site_url": "https://example.test", "category": {"title": "Markets"}}, "created_at": "2026-07-17T02:00:00Z"},
+  {"id": 3, "title": "Long HTML", "content": "<p>Long content</p>", "url": "https://example.test/3", "tags": [], "feed": {"site_url": "https://example.test", "category": {"title": "Technology"}}, "created_at": "2026-07-17T03:00:00Z"},
+  {"id": 4, "title": "Duplicate headline", "content": "Coverage one", "url": "https://example.test/4", "tags": [], "feed": {"site_url": "https://example.test", "category": {"title": "World"}}, "created_at": "2026-07-17T04:00:00Z"},
+  {"id": 5, "title": "Duplicate headline", "content": "Coverage two", "url": "https://example.test/5", "tags": [], "feed": {"site_url": "https://example.test", "category": {"title": "World"}}, "created_at": "2026-07-17T05:00:00Z"},
+  {"id": 6, "title": "Post", "content": "Brief", "url": "https://example.test/6", "feed": {"site_url": "https://example.test", "category": {"title": "Social"}}, "created_at": "2026-07-17T06:00:00Z"},
+  {"id": 7, "title": "Science", "content": "Finding", "url": "https://example.test/7", "tags": [], "feed": {"site_url": "https://example.test", "category": {"title": "Science"}}, "created_at": "2026-07-17T07:00:00Z"},
+  {"id": 8, "title": "Policy", "content": "Update", "url": "https://example.test/8", "tags": [], "feed": {"site_url": "https://example.test", "category": {"title": "World"}}, "created_at": "2026-07-17T08:00:00Z"},
+  {"id": 9, "title": "Finance", "content": "Numbers", "url": "https://example.test/9", "tags": [], "feed": {"site_url": "https://example.test", "category": {"title": "Markets"}}, "created_at": "2026-07-17T09:00:00Z"},
+  {"id": 10, "title": "Culture", "content": "Review", "url": "https://example.test/10", "tags": [], "feed": {"site_url": "https://example.test", "category": {"title": "Culture"}}, "created_at": "2026-07-17T10:00:00Z"}
+]

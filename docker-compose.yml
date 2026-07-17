@@ -36,4 +36,5 @@ services:
         TZ: Asia/Shanghai
     volumes:
         - ./config.yml:/app/config.yml
+        - ./data:/app/data
         # - ./entries.json:/app/entries.json # Provide persistent for AI news

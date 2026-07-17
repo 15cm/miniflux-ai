@@ -5,8 +5,10 @@ import os
 
 # Load render_input directly to avoid triggering core/__init__.py
 # which imports heavy dependencies not needed for these unit tests.
-_render_input_path = os.path.join(os.path.dirname(__file__), '..', 'core', 'render_input.py')
-_spec = importlib.util.spec_from_file_location('render_input', _render_input_path)
+_render_input_path = os.path.join(
+    os.path.dirname(__file__), "..", "core", "render_input.py"
+)
+_spec = importlib.util.spec_from_file_location("render_input", _render_input_path)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 render_agent_input = _mod.render_agent_input
@@ -57,7 +59,9 @@ class TestRenderAgentInput(unittest.TestCase):
     def test_custom_template_renders_fields(self):
         """Custom template can access entry fields."""
         result = render_agent_input("Title: {{ title }}\nURL: {{ url }}", SAMPLE_ENTRY)
-        self.assertEqual(result, "Title: Entry Title\nURL: http://example.org/article.html")
+        self.assertEqual(
+            result, "Title: Entry Title\nURL: http://example.org/article.html"
+        )
 
     def test_content_raw_in_template(self):
         """content is passed raw (not markdownified) to template."""
@@ -66,7 +70,9 @@ class TestRenderAgentInput(unittest.TestCase):
 
     def test_template_with_all_fields(self):
         """Template can access author, tags, etc."""
-        result = render_agent_input("Author: {{ author }}, Tags: {{ tags | join(', ') }}", SAMPLE_ENTRY)
+        result = render_agent_input(
+            "Author: {{ author }}, Tags: {{ tags | join(', ') }}", SAMPLE_ENTRY
+        )
         self.assertEqual(result, "Author: Author Name, Tags: tag1, tag2")
 
     def test_empty_content(self):
@@ -152,5 +158,5 @@ class TestDefaultConstants(unittest.TestCase):
         self.assertIn("Science", data)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

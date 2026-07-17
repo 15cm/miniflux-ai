@@ -9,3 +9,4 @@ schedule
 ratelimit
 google-genai
 Jinja2
+tiktoken

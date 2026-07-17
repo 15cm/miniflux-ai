@@ -1,68 +1,228 @@
+"""Legacy daily news plus bounded structured map/reduce mode."""
+
 import json
 import time
+from uuid import uuid4
 
 from common import logger
 from common.config import Config
-from core.get_ai_result import get_ai_result
+from core.deduplicate import deduplicate_entries
+from core.get_ai_result import get_ai_json_result, get_ai_result
+from core.render_daily_news import render_daily_news
 from core.render_input import render_ai_news_input
+from core.storage import DailyReport, SummaryStore
+from core.token_budget import count_tokens, pack_items
 
 config = Config()
 
-def generate_daily_news(miniflux_client):
-    logger.info('Generating daily news')
-    # fetch entries.json
+
+def _refresh(miniflux_client):
+    feeds = miniflux_client.get_feeds()
+    feed_id = next(
+        (item["id"] for item in feeds if "Newsᴬᴵ for you" in item["title"]), None
+    )
+    if feed_id:
+        miniflux_client.refresh_feed(feed_id)
+
+
+def _legacy(miniflux_client):
     try:
-        with open('entries.json', 'r') as f:
+        with open("entries.json", encoding="utf8") as f:
             entries = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        logger.warning('entries.json not found or corrupted, skipping daily news generation')
         return []
-
     if not entries:
-        logger.info('No entries to generate daily news')
         return []
+    rendered = render_ai_news_input(config.ai_news_input, entries)
+    greeting_prompt = config.ai_news_prompts.get("greeting")
+    greeting = (
+        get_ai_result(greeting_prompt, time.strftime("%B %d, %Y at %I:%M %p"))
+        if greeting_prompt
+        else None
+    )
+    summary_block = get_ai_result(config.ai_news_prompts["summary_block"], rendered)
+    source = (
+        summary_block if config.ai_news_use_summary_block_as_summary_input else rendered
+    )
+    summary = get_ai_result(config.ai_news_prompts["summary"], source)
+    content = "\n\n".join(
+        filter(
+            None,
+            [greeting, "### 🌐Summary\n" + summary, "### 📝News\n" + summary_block],
+        )
+    )
+    with open("ai_news.json", "w", encoding="utf8") as f:
+        json.dump(content, f, indent=4, ensure_ascii=False)
+    _refresh(miniflux_client)
+    # Legacy one-shot state remains for installations with batching disabled.
+    with open("entries.json", "w", encoding="utf8") as f:
+        json.dump([], f, indent=4, ensure_ascii=False)
+    return content
 
+
+def _load_sources(entry_ids):
+    store = SummaryStore(config.storage.path)
+    settings = config.ai_news_batching
+    rows = store.list_summaries(entry_ids=entry_ids, limit=settings.max_entries)
+    return [
+        {
+            "entry_id": str(row["entry_id"]),
+            "title": row["title"],
+            "url": row["url"],
+            "category": row["category"],
+            "datetime": row["published_at"],
+            "content": row["summary_markdown"],
+        }
+        for row in rows
+        if row["agent_name"] == settings.summary_agent
+    ]
+
+
+def _parse_object(raw, key):
     try:
-        rendered_input = render_ai_news_input(config.ai_news_input, entries)
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) and isinstance(data.get(key), list) else None
 
-        # greeting (optional)
-        greeting_prompt = config.ai_news_prompts.get('greeting')
-        greeting = get_ai_result(greeting_prompt, time.strftime('%B %d, %Y at %I:%M %p')) if greeting_prompt else None
-        # summary_block
-        summary_block = get_ai_result(config.ai_news_prompts['summary_block'], rendered_input)
-        # summary: use summary_block as input (old behavior) or rendered_input (new default)
-        if config.ai_news_use_summary_block_as_summary_input:
-            summary = get_ai_result(config.ai_news_prompts['summary'], summary_block)
-        else:
-            summary = get_ai_result(config.ai_news_prompts['summary'], rendered_input)
 
-        parts = []
-        if greeting:
-            parts.append(greeting)
-        parts.append('### 🌐Summary\n' + summary)
-        parts.append('### 📝News\n' + summary_block)
-        response_content = '\n\n'.join(parts)
+def _map_chunk(chunk):
+    payload = json.dumps({"entries": chunk}, ensure_ascii=False)
+    prompt = "Return JSON object with stories list. Each story needs headline, category, kind, importance, summary, why_it_matters, source_entry_ids, source_urls, confidence. Preserve source IDs and URLs; no invented facts."
+    data = _parse_object(get_ai_json_result(prompt, payload), "stories")
+    if not data:
+        raise ValueError("invalid daily map response")
+    # Accept only output traceable to this chunk.
+    allowed_ids = {
+        str(i)
+        for item in chunk
+        for i in item.get("source_entry_ids", [item.get("entry_id")])
+    }
+    allowed_urls = {
+        url for item in chunk for url in item.get("source_urls", [item.get("url")])
+    }
+    data["stories"] = [
+        story
+        for story in data["stories"]
+        if isinstance(story, dict)
+        and set(map(str, story.get("source_entry_ids", []))) <= allowed_ids
+        and set(story.get("source_urls", [])) <= allowed_urls
+    ]
+    return data["stories"]
 
-        logger.info('Generated daily news successfully')
 
-        with open('ai_news.json', 'w') as f:
-            json.dump(response_content, f, indent=4, ensure_ascii=False)
+def _reduce(stories):
+    payload = json.dumps({"stories": stories}, ensure_ascii=False)
+    if (
+        count_tokens(payload) > config.ai_news_batching.reduce_max_input_tokens
+        and len(stories) > 1
+    ):
+        chunks = pack_items(
+            [
+                {
+                    "story": story,
+                    "token_count": count_tokens(json.dumps(story, ensure_ascii=False)),
+                }
+                for story in stories
+            ],
+            size=config.ai_news_batching.chunk_size,
+            max_input_tokens=config.ai_news_batching.reduce_max_input_tokens,
+        )
+        flattened = []
+        for chunk in chunks:
+            # Intermediate result uses same schema and is recursively bounded.
+            flattened.extend(_map_chunk([item["story"] for item in chunk]))
+        return _reduce(flattened)
+    prompt = "Return JSON daily report with overview list, sections list, opinions object, and watchlist list. Use only supplied source IDs/URLs."
+    data = _parse_object(
+        get_ai_json_result(
+            prompt, payload, max_output_tokens=config.ai_news_batching.max_output_tokens
+        ),
+        "sections",
+    )
+    if not data:
+        raise ValueError("invalid daily reduce response")
+    return data
 
-        # trigger miniflux feed refresh
-        feeds = miniflux_client.get_feeds()
-        ai_news_feed_id = next((item['id'] for item in feeds if 'Newsᴬᴵ for you' in item['title']), None)
 
-        if ai_news_feed_id:
-            miniflux_client.refresh_feed(ai_news_feed_id)
-            logger.debug('Successfully refreshed the ai_news feed in Miniflux!')
-
-    except Exception as e:
-        logger.error(f'Error generating daily news: {e}')
-
-    finally:
+def _batched(miniflux_client, *, entry_ids=None, job_id=None):
+    store = SummaryStore(config.storage.path)
+    sources = _load_sources(entry_ids)
+    if not sources:
+        return None
+    selected = (
+        deduplicate_entries(sources, config.ai_news_batching.similarity_threshold)
+        if config.ai_news_batching.deduplicate
+        else sources
+    )
+    items = [
+        {**item, "token_count": count_tokens(json.dumps(item, ensure_ascii=False))}
+        for item in selected
+    ]
+    chunks = pack_items(
+        items,
+        size=config.ai_news_batching.chunk_size,
+        max_input_tokens=config.ai_news_batching.chunk_max_input_tokens,
+    )
+    stories, failures = [], 0
+    for chunk in chunks:
         try:
-            with open('entries.json', 'w') as f:
-                json.dump([], f, indent=4, ensure_ascii=False)
-            logger.info('Cleared entries.json')
-        except Exception as e:
-            logger.error(f'Failed to clear entries.json: {e}')
+            stories.extend(_map_chunk(chunk))
+        except Exception:
+            failures += 1
+    if failures and not config.ai_news_batching.publish_partial:
+        raise ValueError("daily map stage failed")
+    report = _reduce(stories)
+    if failures:
+        report.setdefault("overview", []).insert(
+            0, "Warning: some source groups could not be processed."
+        )
+    content = render_daily_news(report, config.ai_news_output)
+    source_ids = list(
+        dict.fromkeys(
+            str(i) for story in stories for i in story.get("source_entry_ids", [])
+        )
+    )
+    report_id = str(uuid4())
+    if job_id is None:
+        job_id = store.create_job(
+            "daily_news", len(sources), {"entry_ids": entry_ids or []}
+        )
+    store.save_daily_report(
+        DailyReport(
+            report_id,
+            job_id,
+            "Newsᴬᴵ for you",
+            content,
+            source_ids,
+            config.llm_model or "",
+        )
+    )
+    store.cleanup(
+        summary_retention_days=config.storage.summary_retention_days,
+        report_retention_count=config.storage.report_retention_count,
+        job_retention_days=config.storage.job_retention_days,
+    )
+    store.update_job(
+        job_id,
+        status="partial" if failures else "completed",
+        processed_count=len(sources),
+        failed_count=failures,
+    )
+    _refresh(miniflux_client)
+    return report_id
+
+
+def generate_daily_news(miniflux_client, *, entry_ids=None, job_id=None):
+    logger.info("Generating daily news")
+    try:
+        if config.ai_news_batching.enabled:
+            return _batched(miniflux_client, entry_ids=entry_ids, job_id=job_id)
+        return _legacy(miniflux_client)
+    except Exception as exc:
+        logger.error("Daily news generation failed: %s", type(exc).__name__)
+        if job_id:
+            SummaryStore(config.storage.path).update_job(
+                job_id, status="failed", error="daily news generation failed"
+            )
+        return None

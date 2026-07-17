@@ -5,8 +5,9 @@ The Flask server starts automatically when `webhook_secret` or `ai_news_schedule
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/miniflux-ai` | HMAC signature | Miniflux webhook receiver |
-| `POST` | `/api/reprocess` | None | Force reprocess entries (see below) |
-| `POST` | `/api/generate-daily-news` | None | Trigger daily news generation immediately |
+| `POST` | `/api/reprocess` | Optional bearer token | Force reprocess entries (see below) |
+| `POST` | `/api/generate-daily-news` | Optional bearer token | Trigger daily news generation immediately |
+| `GET` | `/api/jobs/<job_id>` | Optional bearer token | Get durable background-job status |
 | `GET`  | `/rss/ai-news` | None | AI news RSS feed |
 
 ## `POST /api/reprocess`
@@ -45,7 +46,7 @@ curl -X POST http://localhost:80/api/reprocess \
 
 **Response**:
 ```json
-{"status": "ok", "queued": 42}
+{"status": "queued", "job_id": "uuid", "queued": 42}
 ```
 
 Processing runs in background; response returns immediately with count of queued entries.
@@ -80,12 +81,12 @@ curl -X POST http://localhost:80/api/generate-daily-news \
 
 **Response** (no scope):
 ```json
-{"status": "ok"}
+{"status": "queued", "job_id": "uuid", "queued": 0}
 ```
 
 **Response** (with scope):
 ```json
-{"status": "ok", "queued": 42}
+{"status": "queued", "job_id": "uuid", "queued": 42}
 ```
 
-Generation runs in background; response returns immediately. On completion, `ai_news.json` is updated and the Miniflux AI news feed is refreshed.
+Generation runs in background; response returns immediately. Batch mode persists reports in SQLite, so RSS reads never clear a report. Query the job endpoint for `queued`, `running`, `completed`, `partial`, or `failed` status. Enable bearer protection with `api.bearer_token`, `api.protect_manual_endpoints`, and `api.protect_job_endpoint`.
