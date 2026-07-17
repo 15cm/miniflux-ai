@@ -110,7 +110,9 @@ class SummaryStore:
                 ),
             )
 
-    def list_summaries(self, *, entry_ids=None, limit=None, after=None):
+    def list_summaries(
+        self, *, entry_ids=None, limit=None, after=None, agent_name=None
+    ):
         self.initialize()
         query, values = "SELECT * FROM entry_summaries", []
         clauses = []
@@ -123,6 +125,9 @@ class SummaryStore:
         if after is not None:
             clauses.append("published_at >= ?")
             values.append(after)
+        if agent_name is not None:
+            clauses.append("agent_name = ?")
+            values.append(agent_name)
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY published_at DESC"

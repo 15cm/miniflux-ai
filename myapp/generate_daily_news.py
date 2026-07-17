@@ -18,6 +18,7 @@ miniflux_client = miniflux.Client(
 def _build_entries_json(entries):
     data = [
         {
+            "entry_id": e["id"],
             "datetime": e["created_at"],
             "category": e["feed"]["category"]["title"],
             "title": e["title"],

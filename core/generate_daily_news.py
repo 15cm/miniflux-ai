@@ -60,11 +60,42 @@ def _legacy(miniflux_client):
     return content
 
 
+def _legacy_sources(entry_ids):
+    try:
+        with open("entries.json", encoding="utf8") as file:
+            rows = json.load(file)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+    wanted = {str(entry_id) for entry_id in entry_ids or []}
+    sources = []
+    for row in rows:
+        entry_id = str(row.get("entry_id", row.get("id", "")))
+        if wanted and entry_id not in wanted:
+            continue
+        sources.append(
+            {
+                "entry_id": entry_id,
+                "title": row.get("title", ""),
+                "url": row.get("url", ""),
+                "category": row.get("category", ""),
+                "datetime": row.get("datetime", row.get("created_at", "")),
+                "content": row.get("content", ""),
+            }
+        )
+    return sources
+
+
 def _load_sources(entry_ids):
     store = SummaryStore(config.storage.path)
     settings = config.ai_news_batching
-    rows = store.list_summaries(entry_ids=entry_ids, limit=settings.max_entries)
-    return [
+    if settings.source == "raw_entries":
+        return _legacy_sources(entry_ids)[: settings.max_entries]
+    rows = store.list_summaries(
+        entry_ids=entry_ids,
+        limit=settings.max_entries,
+        agent_name=settings.summary_agent,
+    )
+    summaries = [
         {
             "entry_id": str(row["entry_id"]),
             "title": row["title"],
@@ -74,8 +105,16 @@ def _load_sources(entry_ids):
             "content": row["summary_markdown"],
         }
         for row in rows
-        if row["agent_name"] == settings.summary_agent
     ]
+    if settings.source != "prefer_summaries":
+        return summaries
+    covered = {item["entry_id"] for item in summaries}
+    return (
+        summaries
+        + [row for row in _legacy_sources(entry_ids) if row["entry_id"] not in covered][
+            : max(0, settings.max_entries - len(summaries))
+        ]
+    )
 
 
 def _parse_object(raw, key):
@@ -87,7 +126,15 @@ def _parse_object(raw, key):
 
 
 def _map_chunk(chunk):
-    payload = json.dumps({"entries": chunk}, ensure_ascii=False)
+    payload = json.dumps(
+        {
+            "entries": [
+                {key: value for key, value in item.items() if key != "token_count"}
+                for item in chunk
+            ]
+        },
+        ensure_ascii=False,
+    )
     prompt = "Return JSON object with stories list. Each story needs headline, category, kind, importance, summary, why_it_matters, source_entry_ids, source_urls, confidence. Preserve source IDs and URLs; no invented facts."
     data = _parse_object(get_ai_json_result(prompt, payload), "stories")
     if not data:
@@ -130,8 +177,14 @@ def _reduce(stories):
         )
         flattened = []
         for chunk in chunks:
-            # Intermediate result uses same schema and is recursively bounded.
-            flattened.extend(_map_chunk([item["story"] for item in chunk]))
+            intermediate = json.dumps(
+                {"stories": [item["story"] for item in chunk]}, ensure_ascii=False
+            )
+            prompt = "Return JSON object with a bounded stories list. Preserve every supplied source ID and URL."
+            result = _parse_object(get_ai_json_result(prompt, intermediate), "stories")
+            if not result:
+                raise ValueError("invalid intermediate reduce response")
+            flattened.extend(result["stories"])
         return _reduce(flattened)
     prompt = "Return JSON daily report with overview list, sections list, opinions object, and watchlist list. Use only supplied source IDs/URLs."
     data = _parse_object(

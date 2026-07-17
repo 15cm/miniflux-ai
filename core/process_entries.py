@@ -11,6 +11,7 @@ import time
 from common.config import Config
 from common.logger import logger
 from core.batch_contracts import (
+    BatchEntryResult,
     BatchItem,
     build_entry_batch_payload,
     parse_entry_batch_response,
@@ -216,6 +217,18 @@ def process_entries(
                 right, rf = handle(batch[midpoint:])
                 valid.update(left)
                 failed = lf | rf
+            if failed and batch_config.fallback_to_individual and len(batch) == 1:
+                item = batch[0]
+                try:
+                    response = get_ai_result(
+                        agent.get("prompt", ""), item["batch_item"].content
+                    )
+                    if response:
+                        entry_id = item["batch_item"].id
+                        valid[entry_id] = BatchEntryResult(entry_id, response)
+                        failed.discard(entry_id)
+                except LLMError:
+                    pass
             return valid, failed
 
         # Executor is bounded per agent; one shared mutation thread joins results.
