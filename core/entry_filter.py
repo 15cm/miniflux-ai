@@ -17,6 +17,15 @@ def filter_entry(config, agent, entry):
         if agent[1].get("deny_list") is not None
         else agent[1].get("blacklist")
     )
+    category_deny_list = agent[1].get("category_deny_list")
+
+    # Miniflux exposes the category on the entry's feed. Category rules take
+    # precedence over URL allowlists so a denied category is always skipped.
+    category = entry.get("feed", {}).get("category", {}).get("title", "")
+    if category_deny_list is not None and any(
+        fnmatch.fnmatch(category, pattern) for pattern in category_deny_list
+    ):
+        return False
 
     # filter, if not content starts with start flag
     if not entry["content"].startswith(tuple(start_with_list)):

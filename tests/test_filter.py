@@ -128,6 +128,64 @@ class MyTestCase(unittest.TestCase):
                 result = filter_entry(config_obj, agent, entry["entry"])
                 self.assertEqual(result, entry["result"])
 
+    def test_category_deny_list(self):
+        config = _as_config(
+            {
+                "agents": {
+                    "summary": {
+                        "title": "summary",
+                        "style_block": False,
+                        "category_deny_list": ["Social", "Private/*"],
+                    }
+                }
+            }
+        )
+        agent = ("summary", config.agents["summary"])
+        denied = {
+            "content": "article",
+            "feed": {
+                "site_url": "https://example.com",
+                "category": {"title": "Social"},
+            },
+        }
+        glob_denied = {
+            "content": "article",
+            "feed": {
+                "site_url": "https://example.com",
+                "category": {"title": "Private/Work"},
+            },
+        }
+        allowed = {
+            "content": "article",
+            "feed": {"site_url": "https://example.com", "category": {"title": "Tech"}},
+        }
+        self.assertFalse(filter_entry(config, agent, denied))
+        self.assertFalse(filter_entry(config, agent, glob_denied))
+        self.assertTrue(filter_entry(config, agent, allowed))
+
+    def test_category_deny_list_overrides_url_allow_list(self):
+        config = _as_config(
+            {
+                "agents": {
+                    "summary": {
+                        "title": "summary",
+                        "style_block": False,
+                        "allow_list": ["https://example.com/*"],
+                        "category_deny_list": ["Social"],
+                    }
+                }
+            }
+        )
+        agent = ("summary", config.agents["summary"])
+        entry = {
+            "content": "article",
+            "feed": {
+                "site_url": "https://example.com/article",
+                "category": {"title": "Social"},
+            },
+        }
+        self.assertFalse(filter_entry(config, agent, entry))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -97,6 +97,9 @@ agents:
     style_block: true
     deny_list:
       - https://ai-news.miniflux
+    # 跳过这些 Miniflux 分类中的文章摘要，支持 shell 风格通配符。
+    # category_deny_list:
+    #   - Social
     allow_list:
 
   translate:

@@ -97,6 +97,10 @@ agents:
     style_block: true
     deny_list:
       - https://ai-news.miniflux
+    # Skip summaries for entries in these Miniflux feed categories.
+    # Shell-style wildcards are supported, for example: "Social*".
+    # category_deny_list:
+    #   - Social
     allow_list:
 
   translate:
