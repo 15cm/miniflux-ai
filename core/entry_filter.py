@@ -1,55 +1,59 @@
 import fnmatch
 
 
+def source_allowed(agent, entry):
+    """Return whether current feed metadata permits an agent to use an entry."""
+    if agent is None:
+        return True
+
+    allow_list = (
+        agent.get("allow_list")
+        if agent.get("allow_list") is not None
+        else agent.get("whitelist")
+    )
+    deny_list = (
+        agent["deny_list"]
+        if agent.get("deny_list") is not None
+        else agent.get("blacklist")
+    )
+    category_deny_list = agent.get("category_deny_list")
+    feed = entry.get("feed") or {}
+    category_data = feed.get("category") or {}
+    category = category_data.get("title")
+    site_url = feed.get("site_url")
+
+    # Missing metadata must not bypass a configured rule. Empty deny lists do
+    # not require metadata because they deny nothing.
+    if category_deny_list:
+        if not category:
+            return False
+        if any(fnmatch.fnmatch(category, pattern) for pattern in category_deny_list):
+            return False
+
+    # Preserve the legacy precedence: a configured allow list supersedes the
+    # URL deny list, while category denials always win.
+    if allow_list is not None:
+        if not site_url:
+            return False
+        return any(fnmatch.fnmatch(site_url, pattern) for pattern in allow_list)
+
+    if deny_list is not None:
+        if deny_list and not site_url:
+            return False
+        return not any(
+            fnmatch.fnmatch(site_url or "", pattern) for pattern in deny_list
+        )
+
+    return True
+
+
 def filter_entry(config, agent, entry):
     start_with_list = [name[1]["title"] for name in config.agents.items()]
     style_block = [name[1]["style_block"] for name in config.agents.items()]
     [start_with_list.append("<blockquote>") for i in style_block if i]
 
-    # Todo Compatible with whitelist/blacklist parameter, to be removed
-    allow_list = (
-        agent[1].get("allow_list")
-        if agent[1].get("allow_list") is not None
-        else agent[1].get("whitelist")
-    )
-    deny_list = (
-        agent[1]["deny_list"]
-        if agent[1].get("deny_list") is not None
-        else agent[1].get("blacklist")
-    )
-    category_deny_list = agent[1].get("category_deny_list")
-
-    # Miniflux exposes the category on the entry's feed. Category rules take
-    # precedence over URL allowlists so a denied category is always skipped.
-    category = entry.get("feed", {}).get("category", {}).get("title", "")
-    if category_deny_list is not None and any(
-        fnmatch.fnmatch(category, pattern) for pattern in category_deny_list
-    ):
+    if not source_allowed(agent[1], entry):
         return False
 
     # filter, if not content starts with start flag
-    if not entry["content"].startswith(tuple(start_with_list)):
-
-        # filter, if in allow_list
-        if allow_list is not None:
-            if any(
-                fnmatch.fnmatch(entry["feed"]["site_url"], pattern)
-                for pattern in allow_list
-            ):
-                return True
-
-        # filter, if not in deny_list
-        elif deny_list is not None:
-            if any(
-                fnmatch.fnmatch(entry["feed"]["site_url"], pattern)
-                for pattern in deny_list
-            ):
-                return False
-            else:
-                return True
-
-        # filter, if allow_list and deny_list are both None
-        elif allow_list is None and deny_list is None:
-            return True
-
-    return False
+    return not entry.get("content", "").startswith(tuple(start_with_list))

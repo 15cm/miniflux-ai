@@ -63,8 +63,10 @@ def _format(agent, response):
 
 def _append_legacy_summary(entry, response):
     item = {
+        "entry_id": entry.get("id"),
         "datetime": entry.get("created_at", ""),
         "category": _category(entry),
+        "site_url": _source(entry),
         "title": entry.get("title", ""),
         "content": response,
         "url": entry.get("url", ""),
@@ -139,6 +141,12 @@ def process_entries(
             for entry in entries
             if filter_entry(config, (agent_name, agent), entry)
         ]
+        logger.info(
+            "Source filter agent=%s candidates=%s eligible=%s",
+            agent_name,
+            len(entries),
+            len(eligible),
+        )
         if not batch_config.enabled:
             for entry in eligible:
                 try:

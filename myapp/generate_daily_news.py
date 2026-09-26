@@ -3,6 +3,8 @@ import json
 import miniflux
 from flask import jsonify, request
 from common.config import Config
+from common.logger import logger
+from core.entry_filter import source_allowed
 from core.generate_daily_news import generate_daily_news
 from core.reprocess_utils import fetch_entries_by_scope
 from core.storage import SummaryStore
@@ -21,6 +23,7 @@ def _build_entries_json(entries):
             "entry_id": e["id"],
             "datetime": e["created_at"],
             "category": e["feed"]["category"]["title"],
+            "site_url": e["feed"].get("site_url"),
             "title": e["title"],
             "content": e["content"],
             "url": e["url"],
@@ -33,11 +36,23 @@ def _build_entries_json(entries):
 
 
 def _build_and_generate(entries, job_id=None):
-    if not config.ai_news_batching.enabled:
+    agent = config.agents.get(config.ai_news_batching.summary_agent)
+    candidate_count = len(entries)
+    entries = [entry for entry in entries if source_allowed(agent, entry)]
+    logger.info(
+        "Manual daily news source filter candidates=%s eligible=%s",
+        candidate_count,
+        len(entries),
+    )
+    if not config.ai_news_batching.enabled or config.ai_news_batching.source in {
+        "raw_entries",
+        "prefer_summaries",
+    }:
         _build_entries_json(entries)
     generate_daily_news(
         miniflux_client,
         entry_ids=[str(entry["id"]) for entry in entries],
+        source_entries=entries,
         job_id=job_id,
     )
 

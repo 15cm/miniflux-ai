@@ -117,6 +117,40 @@ class TestGenerateDailyNewsEndpoint(unittest.TestCase):
             limit=10000, after=10000 - 7200
         )
 
+    def test_scope_filters_denied_entries_before_generation(self):
+        entries = _make_entries(2)
+        entries["entries"][0]["feed"] = {
+            "site_url": "http://x.com",
+            "category": {"title": "Tech"},
+        }
+        entries["entries"][1]["feed"] = {
+            "site_url": "http://blocked.example/feed",
+            "category": {"title": "Private/Work"},
+        }
+        self.mock_mc.get_entries.return_value = entries
+        agents = {
+            "summary": {
+                "category_deny_list": ["Private/*"],
+                "deny_list": ["http://blocked.example/*"],
+            }
+        }
+
+        with patch.object(gdn_module.config, "agents", agents):
+            resp = self._post({"scope": "unread"})
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            self.mock_generate.call_args.kwargs["entry_ids"],
+            ["0"],
+        )
+        self.assertEqual(
+            [
+                entry["id"]
+                for entry in self.mock_generate.call_args.kwargs["source_entries"]
+            ],
+            [0],
+        )
+
     # --- invalid scope ---
 
     def test_invalid_scope(self):

@@ -60,6 +60,10 @@ The repository includes a template configuration file: `config.sample.yml`. Modi
 - **AI News**: Schedule and prompts for daily news generation
 - **Agents**: Define each agent's prompt, allow_list/deny_list filters, category exclusions (`category_deny_list`, supporting shell-style wildcards), and output style（`style_block` parameter controls whether the output is formatted as a code block in Markdown）.
 
+Agent source filters also apply when cached or legacy summaries feed AI News.
+When a configured source rule cannot be evaluated because feed metadata is
+missing, that source is skipped.
+
 
 ## REST API
 

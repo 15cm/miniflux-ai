@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 from yaml import safe_load
-from core.entry_filter import filter_entry
+from core.entry_filter import filter_entry, source_allowed
 
 
 def _as_config(d):
@@ -185,6 +185,35 @@ class MyTestCase(unittest.TestCase):
             },
         }
         self.assertFalse(filter_entry(config, agent, entry))
+
+    def test_source_allowed_ignores_existing_summary_marker(self):
+        agent = {
+            "deny_list": ["https://blocked.example/*"],
+            "category_deny_list": ["Private/*"],
+        }
+        entry = {
+            "content": "<blockquote>old summary</blockquote>",
+            "feed": {
+                "site_url": "https://allowed.example/",
+                "category": {"title": "Tech"},
+            },
+        }
+        self.assertTrue(source_allowed(agent, entry))
+
+    def test_source_allowed_fails_closed_without_category_metadata(self):
+        agent = {"category_deny_list": ["Private/*"]}
+        self.assertFalse(
+            source_allowed(agent, {"feed": {"site_url": "https://example.com"}})
+        )
+
+    def test_source_allowed_fails_closed_without_site_url(self):
+        agent = {"deny_list": ["https://blocked.example/*"]}
+        self.assertFalse(
+            source_allowed(agent, {"feed": {"category": {"title": "Tech"}}})
+        )
+
+    def test_empty_deny_list_does_not_require_site_url(self):
+        self.assertTrue(source_allowed({"deny_list": []}, {"feed": {}}))
 
 
 if __name__ == "__main__":

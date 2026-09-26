@@ -55,6 +55,10 @@ Processing runs in background; response returns immediately with count of queued
 
 Triggers daily news generation. Optionally fetches entries by scope and writes them to `entries.json` before generating (no agents are run).
 
+Entries are checked against the configured summary agent's allow list, URL deny
+list, and category deny list before any daily-news LLM call. Sources missing
+metadata required by a configured rule are skipped.
+
 **Auth**: None required.
 
 **Request body** (JSON, optional):

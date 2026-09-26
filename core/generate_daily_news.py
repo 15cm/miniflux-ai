@@ -1,5 +1,6 @@
 """Legacy daily news plus bounded structured map/reduce mode."""
 
+import concurrent.futures
 import json
 import time
 from uuid import uuid4
@@ -7,6 +8,7 @@ from uuid import uuid4
 from common import logger
 from common.config import Config
 from core.deduplicate import deduplicate_entries
+from core.entry_filter import source_allowed
 from core.get_ai_result import get_ai_json_result, get_ai_result
 from core.render_daily_news import render_daily_news
 from core.render_input import render_ai_news_input
@@ -25,13 +27,36 @@ def _refresh(miniflux_client):
         miniflux_client.refresh_feed(feed_id)
 
 
-def _legacy(miniflux_client):
+def _read_legacy_entries():
     try:
         with open("entries.json", encoding="utf8") as f:
-            entries = json.load(f)
+            return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return []
+
+
+def _legacy_entry(row):
+    return {
+        "feed": {
+            "site_url": row.get("site_url"),
+            "category": {"title": row.get("category")},
+        }
+    }
+
+
+def _filter_legacy_entries(rows):
+    agent = config.agents.get(config.ai_news_batching.summary_agent)
+    return [row for row in rows if source_allowed(agent, _legacy_entry(row))]
+
+
+def _legacy(miniflux_client, *, job_id=None):
+    store = SummaryStore(config.storage.path)
+    if job_id:
+        store.update_job(job_id, status="running")
+    entries = _filter_legacy_entries(_read_legacy_entries())
     if not entries:
+        if job_id:
+            store.update_job(job_id, status="completed", processed_count=0)
         return []
     rendered = render_ai_news_input(config.ai_news_input, entries)
     greeting_prompt = config.ai_news_prompts.get("greeting")
@@ -57,15 +82,13 @@ def _legacy(miniflux_client):
     # Legacy one-shot state remains for installations with batching disabled.
     with open("entries.json", "w", encoding="utf8") as f:
         json.dump([], f, indent=4, ensure_ascii=False)
+    if job_id:
+        store.update_job(job_id, status="completed", processed_count=len(entries))
     return content
 
 
 def _legacy_sources(entry_ids):
-    try:
-        with open("entries.json", encoding="utf8") as file:
-            rows = json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+    rows = _filter_legacy_entries(_read_legacy_entries())
     wanted = {str(entry_id) for entry_id in entry_ids or []}
     sources = []
     for row in rows:
@@ -85,7 +108,49 @@ def _legacy_sources(entry_ids):
     return sources
 
 
-def _load_sources(entry_ids):
+def _eligible_summary_ids(miniflux_client, rows, source_entries=None):
+    agent = config.agents.get(config.ai_news_batching.summary_agent)
+    known = {
+        str(entry["id"]): entry
+        for entry in source_entries or []
+        if entry.get("id") is not None
+    }
+    missing_ids = [
+        str(row["entry_id"]) for row in rows if str(row["entry_id"]) not in known
+    ]
+    unavailable = 0
+
+    def fetch(entry_id):
+        try:
+            return entry_id, miniflux_client.get_entry(int(entry_id))
+        except Exception:
+            return entry_id, None
+
+    if missing_ids:
+        workers = min(config.ai_news_batching.max_workers, len(missing_ids))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            for entry_id, entry in executor.map(fetch, missing_ids):
+                if entry is None:
+                    unavailable += 1
+                else:
+                    known[entry_id] = entry
+
+    eligible = {
+        str(row["entry_id"])
+        for row in rows
+        if str(row["entry_id"]) in known
+        and source_allowed(agent, known[str(row["entry_id"])])
+    }
+    logger.info(
+        "Daily news source filter candidates=%s eligible=%s unavailable=%s",
+        len(rows),
+        len(eligible),
+        unavailable,
+    )
+    return eligible
+
+
+def _load_sources(miniflux_client, entry_ids, source_entries=None):
     store = SummaryStore(config.storage.path)
     settings = config.ai_news_batching
     if settings.source == "raw_entries":
@@ -95,6 +160,7 @@ def _load_sources(entry_ids):
         limit=settings.max_entries,
         agent_name=settings.summary_agent,
     )
+    eligible_ids = _eligible_summary_ids(miniflux_client, rows, source_entries)
     summaries = [
         {
             "entry_id": str(row["entry_id"]),
@@ -105,6 +171,7 @@ def _load_sources(entry_ids):
             "content": row["summary_markdown"],
         }
         for row in rows
+        if str(row["entry_id"]) in eligible_ids
     ]
     if settings.source != "prefer_summaries":
         return summaries
@@ -198,11 +265,11 @@ def _reduce(stories):
     return data
 
 
-def _batched(miniflux_client, *, entry_ids=None, job_id=None):
+def _batched(miniflux_client, *, entry_ids=None, source_entries=None, job_id=None):
     store = SummaryStore(config.storage.path)
     if job_id:
         store.update_job(job_id, status="running")
-    sources = _load_sources(entry_ids)
+    sources = _load_sources(miniflux_client, entry_ids, source_entries)
     if not sources:
         if job_id:
             store.update_job(job_id, status="completed")
@@ -270,12 +337,19 @@ def _batched(miniflux_client, *, entry_ids=None, job_id=None):
     return report_id
 
 
-def generate_daily_news(miniflux_client, *, entry_ids=None, job_id=None):
+def generate_daily_news(
+    miniflux_client, *, entry_ids=None, source_entries=None, job_id=None
+):
     logger.info("Generating daily news")
     try:
         if config.ai_news_batching.enabled:
-            return _batched(miniflux_client, entry_ids=entry_ids, job_id=job_id)
-        return _legacy(miniflux_client)
+            return _batched(
+                miniflux_client,
+                entry_ids=entry_ids,
+                source_entries=source_entries,
+                job_id=job_id,
+            )
+        return _legacy(miniflux_client, job_id=job_id)
     except Exception as exc:
         logger.error("Daily news generation failed: %s", type(exc).__name__)
         if job_id:
