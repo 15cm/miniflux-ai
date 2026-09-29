@@ -1,11 +1,11 @@
 import time
 from common.logger import logger
+from core.fetch_entries import fetch_entries_paginated
 from core.process_entries import process_entries
 
 
 def fetch_unread_entries(config, miniflux_client):
-    result = miniflux_client.get_entries(status=["unread"], limit=10000)
-    entries = result["entries"]
+    entries = fetch_entries_paginated(miniflux_client, status=["unread"])
     if not entries:
         logger.info("No new entries")
         return None

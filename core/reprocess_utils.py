@@ -2,6 +2,7 @@ import re
 import time
 from common.config import Config
 from common.logger import logger
+from core.fetch_entries import fetch_entries_paginated
 from core.process_entries import process_entries
 
 config = Config()
@@ -18,19 +19,24 @@ def fetch_entries_by_scope(miniflux_client, body):
     scope = body.get("scope")
     if scope == "unread":
         return (
-            miniflux_client.get_entries(status=["unread"], limit=10000)["entries"],
+            fetch_entries_paginated(
+                miniflux_client, max_entries=10000, status=["unread"]
+            ),
             None,
         )
     if scope == "all":
-        return miniflux_client.get_entries(limit=10000)["entries"], None
+        return fetch_entries_paginated(miniflux_client, max_entries=10000), None
     if scope == "last_n":
         n = body.get("n")
         if not isinstance(n, int) or isinstance(n, bool) or n <= 0:
             return None, ("n must be a positive integer", 400)
         return (
-            miniflux_client.get_entries(
-                limit=n, order="published_at", direction="desc"
-            )["entries"],
+            fetch_entries_paginated(
+                miniflux_client,
+                max_entries=n,
+                order="published_at",
+                direction="desc",
+            ),
             None,
         )
     if scope == "duration":
@@ -38,9 +44,11 @@ def fetch_entries_by_scope(miniflux_client, body):
         if seconds is None:
             return None, ('duration must be like "30m", "2h", "1d"', 400)
         return (
-            miniflux_client.get_entries(limit=10000, after=int(time.time()) - seconds)[
-                "entries"
-            ],
+            fetch_entries_paginated(
+                miniflux_client,
+                max_entries=10000,
+                after=int(time.time()) - seconds,
+            ),
             None,
         )
     return None, ("scope must be one of: unread, all, last_n, duration", 400)

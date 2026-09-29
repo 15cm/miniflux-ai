@@ -94,19 +94,21 @@ class TestReprocessEndpoint(unittest.TestCase):
         data = resp.get_json()
         self.assertEqual(data["status"], "queued")
         self.assertEqual(data["queued"], 3)
-        self.mock_mc.get_entries.assert_called_once_with(status=["unread"], limit=10000)
+        self.mock_mc.get_entries.assert_called_once_with(
+            status=["unread"], limit=1000, offset=0
+        )
 
     def test_scope_all(self):
         resp = self._post({"scope": "all"})
         self.assertEqual(resp.status_code, 200)
-        self.mock_mc.get_entries.assert_called_once_with(limit=10000)
+        self.mock_mc.get_entries.assert_called_once_with(limit=1000, offset=0)
 
     def test_scope_last_n(self):
         resp = self._post({"scope": "last_n", "n": 10})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.get_json()["queued"], 3)
         self.mock_mc.get_entries.assert_called_once_with(
-            limit=10, order="published_at", direction="desc"
+            limit=10, offset=0, order="published_at", direction="desc"
         )
 
     def test_scope_duration(self):
@@ -115,7 +117,7 @@ class TestReprocessEndpoint(unittest.TestCase):
             resp = self._post({"scope": "duration", "duration": "1h"})
         self.assertEqual(resp.status_code, 200)
         self.mock_mc.get_entries.assert_called_once_with(
-            limit=10000, after=10000 - 3600
+            limit=1000, offset=0, after=10000 - 3600
         )
 
     def test_scope_invalid(self):

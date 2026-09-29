@@ -88,7 +88,9 @@ class TestGenerateDailyNewsEndpoint(unittest.TestCase):
         data = resp.get_json()
         self.assertEqual(data["status"], "queued")
         self.assertEqual(data["queued"], 3)
-        self.mock_mc.get_entries.assert_called_once_with(status=["unread"], limit=10000)
+        self.mock_mc.get_entries.assert_called_once_with(
+            status=["unread"], limit=1000, offset=0
+        )
         self.mock_generate.assert_called_once()
         self.assertEqual(self.mock_generate.call_args.args, (self.mock_mc,))
         self.assertEqual(
@@ -98,14 +100,14 @@ class TestGenerateDailyNewsEndpoint(unittest.TestCase):
     def test_scope_all(self):
         resp = self._post({"scope": "all"})
         self.assertEqual(resp.status_code, 200)
-        self.mock_mc.get_entries.assert_called_once_with(limit=10000)
+        self.mock_mc.get_entries.assert_called_once_with(limit=1000, offset=0)
         self.mock_generate.assert_called_once()
 
     def test_scope_last_n(self):
         resp = self._post({"scope": "last_n", "n": 5})
         self.assertEqual(resp.status_code, 200)
         self.mock_mc.get_entries.assert_called_once_with(
-            limit=5, order="published_at", direction="desc"
+            limit=5, offset=0, order="published_at", direction="desc"
         )
 
     def test_scope_duration(self):
@@ -114,7 +116,7 @@ class TestGenerateDailyNewsEndpoint(unittest.TestCase):
             resp = self._post({"scope": "duration", "duration": "2h"})
         self.assertEqual(resp.status_code, 200)
         self.mock_mc.get_entries.assert_called_once_with(
-            limit=10000, after=10000 - 7200
+            limit=1000, offset=0, after=10000 - 7200
         )
 
     def test_scope_filters_denied_entries_before_generation(self):
